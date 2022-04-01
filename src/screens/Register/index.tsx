@@ -1,8 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, TouchableWithoutFeedback, Keyboard, Alert } from "react-native";
 import { useForm } from "react-hook-form";
 import * as Yup from "yup";
 import { yupResolver } from "@hookform/resolvers/yup";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import uuid from 'react-native-uuid';
+import { useNavigation } from '@react-navigation/native'
 import { InputForm } from "../../components/Forms/InputForm";
 import { Input } from "../../components/Forms/Input";
 import { Button } from "../../components/Forms/Button";
@@ -37,6 +40,8 @@ export function Register() {
   const [transactionType, setTransactionType] = useState("");
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
 
+  const dataKey = '@gofinances:transaction';
+
   // const [name, setName] = useState("");
   // const [amount, setAmount] = useState("");
 
@@ -45,9 +50,12 @@ export function Register() {
     name: "Category",
   });
 
+  const navigation = useNavigation();
+
   const {
     control,
     handleSubmit,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: yupResolver(schema),
@@ -65,19 +73,64 @@ export function Register() {
     setCategoryModalOpen(true);
   }
 
-  function handleRegister(form: FormData) {
+  async function handleRegister(form: FormData) {
     if (!transactionType) return Alert.alert("Select transaction type");
 
     if (category.key === "category") return Alert.alert("Select an category");
 
-    const data = {
+    const newTransaction = {
+      id: String(uuid.v4()),
       name: form.name,
       amount: form.amount,
       transactionType,
       category: category.key,
+      date: new Date()
     };
-    console.log(data);
+
+    try {
+      const data = await AsyncStorage.getItem(dataKey);
+      const currentData = data ? JSON.parse(data) : [];
+
+      const daaFormaatted = [
+        ...currentData,
+        newTransaction
+      ];
+
+
+      await AsyncStorage.setItem(dataKey, JSON.stringify(daaFormaatted));
+
+      reset();
+
+      setTransactionType('');
+      setCategory({
+        key: 'category',
+        name: 'Category'
+      });
+
+      navigation.navigate('List');
+
+    } catch (error) {
+      console.log(error);
+      Alert.alert("We cant't save this!");
+    }
+
+    //console.log(data);
   }
+
+  useEffect(() => {
+    async function loadData() {
+      const data = await AsyncStorage.getItem(dataKey);
+      console.log(JSON.parse(data!));
+    }
+
+    loadData();
+
+    // async function removeAll() {
+    //   await AsyncStorage.removeItem(dataKey);
+    // }
+    // removeAll();
+
+  }, []);
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
